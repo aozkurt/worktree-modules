@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test on Node ${{ matrix.node }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: [22, 24]
+        include:
+          - os: windows-latest
+            node: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Run the built command
+        shell: bash
+        run: |
+          node dist/cli.js --version
+          git config --global user.name CI
+          git config --global user.email ci@example.com
+          git config --global init.defaultBranch main
+          cd "$RUNNER_TEMP"
+          mkdir app && cd app && git init -q
+          printf 'node_modules/\n' > .gitignore
+          echo '{ "name": "app", "private": true }' > package.json
+          git add -A && git commit -qm init
+          mkdir -p node_modules/react && echo 'module.exports = 1' > node_modules/react/index.js
+          node "$GITHUB_WORKSPACE/dist/cli.js" add ../feature
+          node -e "require('../feature/node_modules/react')"
+          node "$GITHUB_WORKSPACE/dist/cli.js" doctor
+          node "$GITHUB_WORKSPACE/dist/cli.js" remove ../feature
+          test -f node_modules/react/index.js
+      - name: Removal check (what other tools delete through a link)
+        run: node scripts/removal-check.mjs
+
+  node-20:
+    # The tests need Node 22, but the command itself supports Node 20.
+    name: Run on Node 20
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Add, check and remove a worktree with the built command
+        run: |
+          node --version
+          git config --global user.name CI
+          git config --global user.email ci@example.com
+          cd "$RUNNER_TEMP"
+          mkdir app && cd app && git init -q -b main
+          printf 'node_modules/\n' > .gitignore
+          echo '{ "name": "app", "private": true }' > package.json
+          git add -A && git commit -qm init
+          mkdir -p node_modules/react && echo 'module.exports = 1' > node_modules/react/index.js
+          node "$GITHUB_WORKSPACE/dist/cli.js" add ../feature --json > add.json
+          node -e "const r = require('./add.json'); if (!r.ok || r.folders[0].links !== 1) { console.error(r); process.exit(1); }"
+          node "$GITHUB_WORKSPACE/dist/cli.js" doctor
+          node "$GITHUB_WORKSPACE/dist/cli.js" remove ../feature
+          test -f node_modules/react/index.js
+          test ! -e ../feature
