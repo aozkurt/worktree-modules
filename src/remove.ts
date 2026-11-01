@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { changes, checkoutRoot, git, listWorktrees } from "./git.js";
-import { findLinks, hasCode, lexists, linkTarget, removeLink, removeTree } from "./links.js";
+import { findLinks, hasCode, isLink, lexists, linkTarget, removeLink, removeTree } from "./links.js";
 import { CommandError, type RemoveResult } from "./model.js";
 import { isDirectory, realPath, samePath, show, within } from "./paths.js";
 
@@ -39,9 +39,11 @@ export function remove(target: string, options: RemoveOptions = {}): RemoveResul
     throw new CommandError(`${target} is locked${worktree.locked ? ` (${worktree.locked})` : ""}: run git worktree unlock first`);
   }
   if (!options.force) {
-    const changed = changes(worktree.path);
+    // A link holds no work. Git lists a symlinked node_modules as untracked, because node_modules/ in .gitignore
+    // matches folders only.
+    const changed = changes(worktree.path).filter((change) => !(change.status === "??" && isLink(path.join(worktree.path, change.path))));
     if (changed.length > 0) {
-      const list = changed.slice(0, 10).map((line) => `  ${line}`);
+      const list = changed.slice(0, 10).map((change) => `  ${change.status} ${change.path}`);
       if (changed.length > 10) list.push(`  … and ${changed.length - 10} more`);
       throw new CommandError(`${target} has changes, so it stays (--force removes it anyway):\n${list.join("\n")}`);
     }

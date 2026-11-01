@@ -79,7 +79,24 @@ export function ignoredPaths(root: string): string[] {
   return output(root, ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"]).split("\0").filter(Boolean);
 }
 
-/** Modified and untracked files, as `git status --porcelain` lists them. */
-export function changes(root: string): string[] {
-  return output(root, ["status", "--porcelain", "--ignore-submodules=none"]).split("\n").filter(Boolean);
+export interface Change {
+  /** The two status letters of `git status --porcelain`, such as " M" or "??". */
+  status: string;
+  /** Relative to the checkout, with "/". */
+  path: string;
+}
+
+/** Modified and untracked files. */
+export function changes(root: string): Change[] {
+  const entries = output(root, ["status", "--porcelain", "-z", "--ignore-submodules=none"]).split("\0");
+  const found: Change[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]!;
+    if (entry === "") continue;
+    const status = entry.slice(0, 2);
+    found.push({ status, path: entry.slice(3) });
+    // A rename or a copy is followed by the path it came from.
+    if (status.includes("R") || status.includes("C")) i++;
+  }
+  return found;
 }
