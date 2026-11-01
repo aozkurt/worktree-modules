@@ -33,7 +33,7 @@ No dependencies, any shell, and any worktree manager: it runs on its own or as y
 - **`npm ci` in that worktree does the same.** It deletes each entry of `node_modules` before it installs, and through one link those entries are the main checkout's packages.
 - **`mklink /J` fails from Git Bash.** `cmd //c mklink /J link target` answers `Invalid switch - "link".` worktree-modules makes junctions with Node, from any shell.
 - **Workspace packages come from the wrong checkout.** In an npm workspace, `node_modules/@acme/ui` is a link to `packages/ui`. Share the main checkout's `node_modules`, and the worktree builds and tests the main checkout's `packages/ui` instead of its own.
-- **Paths over 260 characters.** An Android build leaves paths like `node_modules/<plugin>/android/build/…` that `git worktree remove` cannot delete (`Filename too long`). Git then forgets the worktree anyway and leaves the folder behind.
+- **Paths over 260 characters.** An Android build leaves paths like `node_modules/<plugin>/android/build/…`. Git for Windows 2.52.0 could not delete them in `git worktree remove` (`Filename too long`, unless `core.longpaths` is on), and then forgot the worktree anyway, leaving the folder behind.
 - **Ignored files are missing.** A new worktree has no `.env` and no `android/local.properties`.
 - **Some tools look through the links.** Capacitor's `npx cap sync` writes the main checkout's plugin paths into `android/capacitor.settings.gradle`, and the Vite dev server answers 403 for files under the main checkout's `node_modules`, such as fonts, unless `server.fs.allow` lists it.
 - **A branch with other dependencies needs its own install.** The main checkout's packages are wrong for a branch whose lockfile differs.
@@ -101,7 +101,7 @@ Takes the links out and deletes the linked `node_modules` folders, without touch
 
 ### remove &lt;path&gt;
 
-1. Stops if the worktree has changes or untracked files, unless you pass `--force`, as `git worktree remove` does.
+1. Stops if the worktree has changes or untracked files (links do not count), unless you pass `--force`, as `git worktree remove` does.
 2. Takes out every link in the worktree, wherever it is, without entering it.
 3. Deletes the worktree's files itself, paths over 260 characters too. If a program holds a file open, it stops here and the worktree stays registered, so you can run it again. After an Android build, run `gradlew --stop` first: Gradle daemons keep build files open.
 4. Runs `git worktree remove --force`, so git forgets the worktree.
