@@ -48,6 +48,8 @@ jobs:
           node "$GITHUB_WORKSPACE/dist/cli.js" doctor
           node "$GITHUB_WORKSPACE/dist/cli.js" remove ../feature
           test -f node_modules/react/index.js
+      - name: Removal check (what other tools delete through a link)
+        run: node scripts/removal-check.mjs
 
   node-20:
     # The tests need Node 22, but the command itself supports Node 20.
