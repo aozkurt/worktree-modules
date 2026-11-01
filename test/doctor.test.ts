@@ -60,7 +60,7 @@ describe("doctor", () => {
       code: "single-link",
       severity: "error",
       message: expect.stringMatching(
-        /^node_modules is one link to the main checkout's node_modules: npm ci here would empty it, git worktree remove on Windows would delete its files, and the workspace packages @acme\/core, @acme\/ui come from the main checkout\. worktree-modules link \.\.\/single replaces it with a link per package\.$/,
+        /^node_modules is one link to the main checkout's node_modules: npm ci here would empty it, git worktree remove from Git for Windows before 2.54 would delete its files, and the workspace packages @acme\/core, @acme\/ui come from the main checkout\. worktree-modules link \.\.\/single replaces it with a link per package\.$/,
       ),
     });
     expect(notes.single).toContainEqual(expect.objectContaining({ code: "not-linked", message: expect.stringContaining("packages/ui/node_modules is missing") }));

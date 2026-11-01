@@ -29,7 +29,7 @@ No dependencies, any shell, and any worktree manager: it runs on its own or as y
 
 `npm install` in every worktree is slow and fills the disk with copies of the same packages. Linking the main checkout's `node_modules` instead is an old trick, and on Windows it comes with traps. These come from real Capacitor apps:
 
-- **`git worktree remove` deletes what a junction points to.** Git for Windows follows junctions when it deletes a worktree, with or without `--force`. If the worktree's `node_modules` is a junction to the main checkout's, the main checkout's packages are gone. See [what deletes through a junction](#what-deletes-through-a-junction).
+- **`git worktree remove` deletes what a junction points to**, in Git for Windows before 2.54: it follows junctions when it deletes a worktree, with or without `--force`. If the worktree's `node_modules` is a junction to the main checkout's, the main checkout's packages are gone. Git for Windows 2.54 [stopped traversing junctions](https://github.com/git-for-windows/git/pull/6151) there, but other ways of deleting still follow them. See [what deletes through a junction](#what-deletes-through-a-junction).
 - **`npm ci` in that worktree does the same.** It deletes each entry of `node_modules` before it installs, and through one link those entries are the main checkout's packages.
 - **`mklink /J` fails from Git Bash.** `cmd //c mklink /J link target` answers `Invalid switch - "link".` worktree-modules makes junctions with Node, from any shell.
 - **Workspace packages come from the wrong checkout.** In an npm workspace, `node_modules/@acme/ui` is a link to `packages/ui`. Share the main checkout's `node_modules`, and the worktree builds and tests the main checkout's `packages/ui` instead of its own.
@@ -42,24 +42,25 @@ worktree-modules makes one link per package, which `npm ci` removes without touc
 
 ## What deletes through a junction
 
-Before the list above was written, each way of deleting a folder ran against a junction to a folder with 4 files, on Windows 10 (build 19045) with Git for Windows 2.52.0, Node 24.13.0, npm 11.6.2 and Windows PowerShell 5.1:
+Before the list above was written, each way of deleting a folder ran against a junction to a folder with 4 files, on two machines: a Windows 10 PC (build 19045) with Git for Windows 2.52.0, Node 24.13.0 and npm 11.6.2, and a GitHub Actions runner with Windows Server 2025 (build 26100), Git for Windows 2.56.0, Node 24.22.1 and npm 11.19.1. "Yes" means the files the junction points to were deleted.
 
-| Command | Deleted the files the junction points to |
-| --- | --- |
-| `git worktree remove <worktree>`, with or without `--force` | **Yes** |
-| `git worktree remove --force` with a junction per package | **Yes**, the files of every linked package |
-| `rm -rf <junction>/` in Git Bash, with the trailing slash | **Yes** |
-| `npm ci` in a worktree whose `node_modules` is one junction | **Yes**, and then it installed into the worktree |
-| `rm -rf <junction>`, or `rm -rf` on the folder that holds it, in Git Bash | No |
-| `Remove-Item -Recurse -Force` in PowerShell 5.1, on the junction or its folder | No |
-| `rmdir /s /q` in cmd, on the junction or its folder | No |
-| `del /s /q <folder>` in cmd | No |
-| Node's `fs.rmSync(path, { recursive: true, force: true })`, on the junction or its folder | No |
-| `git clean -fdx` in the worktree | No |
-| `npm install` in a worktree whose `node_modules` is one junction | No, it replaced the junction with a folder |
-| `npm ci` with a junction per package, as worktree-modules makes them | No |
+| Command | Git 2.52.0, Windows 10 | Git 2.56.0, Windows Server 2025 |
+| --- | --- | --- |
+| `git worktree remove <worktree>`, with or without `--force` | **Yes** | No |
+| `git worktree remove --force` with a junction per package | **Yes**, the files of every linked package | No |
+| `rm -rf <junction>/` in Git Bash, with the trailing slash | **Yes** | **Yes** |
+| `npm ci` in a worktree whose `node_modules` is one junction | **Yes**, and then it installed into the worktree | **Yes** |
+| `rm -rf <junction>`, or `rm -rf` on the folder that holds it, in Git Bash | No | No |
+| `Remove-Item -Recurse -Force` in PowerShell 5.1, on the junction or its folder | No | No |
+| `Remove-Item -Recurse -Force` in PowerShell 7, on the junction or its folder | not installed | No |
+| `rmdir /s /q` in cmd, on the junction or its folder | No | No |
+| `del /s /q <folder>` in cmd | No | No |
+| Node's `fs.rmSync(path, { recursive: true, force: true })`, on the junction or its folder | No | No |
+| `git clean -fdx` in the worktree | No | No |
+| `npm install` in a worktree whose `node_modules` is one junction | No, it replaced the junction with a folder | No |
+| `npm ci` with a junction per package, as worktree-modules makes them | No | No |
 
-Explorer and other tools were not tested. [`scripts/removal-check.mjs`](scripts/removal-check.mjs) runs these checks on your machine (`node scripts/removal-check.mjs` in a clone), and CI runs it on Windows and Linux. Other versions may behave differently, so worktree-modules relies on none of them: `remove` takes every link out first and then deletes the rest itself, without following links.
+The difference in the first two rows is Git for Windows 2.54, whose [release notes](https://github.com/git-for-windows/git/releases/tag/v2.54.0.windows.1) say that `git worktree remove` no longer traverses NTFS junctions. Explorer and other tools were not tested. [`scripts/removal-check.mjs`](scripts/removal-check.mjs) runs these checks on your machine (`node scripts/removal-check.mjs` in a clone), and CI runs it on Windows and Linux. Versions differ, so worktree-modules relies on none of them: `remove` takes every link out first and then deletes the rest itself, without following links.
 
 ## Usage
 
@@ -118,7 +119,7 @@ worktree-modules 0.1.0
 ● .           main     the main checkout, 2 node_modules folders installed
 ✔ ../feature  feature  2 node_modules folders linked
 ✖ ../hotfix   hotfix   node_modules a single link, packages/ui/node_modules missing
-    ✖ node_modules is one link to the main checkout's node_modules: npm ci here would empty it, git worktree remove on Windows would delete its files, and the workspace packages @acme/core, @acme/ui come from the main checkout. worktree-modules link ../hotfix replaces it with a link per package.
+    ✖ node_modules is one link to the main checkout's node_modules: npm ci here would empty it, git worktree remove from Git for Windows before 2.54 would delete its files, and the workspace packages @acme/core, @acme/ui come from the main checkout. worktree-modules link ../hotfix replaces it with a link per package.
     ▲ packages/ui/node_modules is missing: worktree-modules link ../hotfix links it
     ▲ .env, android/local.properties are not here: worktree-modules link ../hotfix copies them
 
@@ -164,7 +165,7 @@ feature/
 | `link` | More ignored folders to share, each as one link, such as `ios/App/Pods`. A `node_modules` folder in this list gets a link per package. |
 | `install` | `true` to run a clean install instead of linking, or the command to run, such as `"npm ci --ignore-scripts"`. |
 
-The worktree's config comes first, so a branch can change it, then the main checkout's. `--config <file>` reads another file. Without a `copy` list, `link` names the ignored `.env` and `.properties` files that the worktree lacks.
+The worktree's config comes first, so a branch can change it, then the main checkout's. `--config <file>` reads another file. `link` and `doctor` also name the ignored `.env`, `.properties` and Firebase config files that the worktree lacks and the `copy` list leaves out.
 
 ## Use it with your worktree manager
 
@@ -235,7 +236,7 @@ worktree-modules does one thing: it shares `node_modules` without copies on NTFS
 - Junctions work on local drives, not on network shares.
 - Moving the main checkout breaks the links: run `link` again.
 - It is tested with npm. pnpm, Yarn and Bun keep their packages in `node_modules` folders too and should work the same way, but they are not tested yet. Yarn Plug'n'Play has no `node_modules` to share.
-- Other tools still follow junctions when they delete a worktree: use `worktree-modules remove`, or `unlink` in your manager's pre-remove hook.
+- Some tools follow links when they delete (Git for Windows before 2.54, `rm -rf` with a trailing slash, the delete code of other tools): remove worktrees with `worktree-modules remove`, or run `unlink` in your manager's pre-remove hook.
 
 ## Contributing
 

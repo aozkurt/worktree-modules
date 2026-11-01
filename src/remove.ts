@@ -14,8 +14,8 @@ export interface RemoveOptions {
 
 /**
  * Removes a worktree without touching what its links point to. It takes out every link first, then deletes the
- * worktree's own files (paths over 260 characters too), and lets git worktree remove forget it. Git would follow
- * junctions on Windows, and when it fails to delete a folder it forgets the worktree anyway.
+ * worktree's own files (paths over 260 characters too), and lets git worktree remove forget it. Git for Windows
+ * before 2.54 follows junctions, and when git fails to delete a folder it forgets the worktree anyway.
  */
 export function remove(target: string, options: RemoveOptions = {}): RemoveResult {
   const cwd = options.cwd ?? process.cwd();

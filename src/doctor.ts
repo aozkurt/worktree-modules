@@ -116,7 +116,7 @@ function checkFolder(source: string, root: string, rel: string, info: ReturnType
   } else if (info.kind === "link") {
     const target = info.target ?? "";
     const fromMain = isDirectory(target) ? [...inspectFolder(target).links].filter(([, to]) => isMainWorkspace(source, root, to)).map(([pkg]) => pkg) : [];
-    const consequences = ["npm ci here would empty it", "git worktree remove on Windows would delete its files"];
+    const consequences = ["npm ci here would empty it", "git worktree remove from Git for Windows before 2.54 would delete its files"];
     if (fromMain.length > 0) consequences.push(`the workspace packages ${list(fromMain)} come from the main checkout`);
     const where = samePath(realPath(target), path.join(source, rel)) ? `the main checkout's ${name}` : show(target, cwd);
     notes.push({

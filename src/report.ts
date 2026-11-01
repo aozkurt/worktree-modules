@@ -60,7 +60,9 @@ export function formatRemove(result: RemoveResult, options: FormatOptions): stri
   const { style, symbols, cwd } = options;
   const ok = style.green(symbols.ok);
   const lines: string[] = [];
-  if (result.unlinked > 0) lines.push(`${ok} Took out ${count(result.unlinked, "link")} first, so nothing they point to was touched`);
+  if (result.unlinked > 0) {
+    lines.push(`${ok} Took out ${count(result.unlinked, "link")} first, so nothing ${result.unlinked === 1 ? "it points" : "they point"} to was touched`);
+  }
   lines.push(...result.notes.map((note) => formatNote(note, options)));
   if (result.method === "prune") lines.push(`${ok} The folder was gone already; git worktree prune forgot ${show(result.worktree, cwd)}`);
   else if (result.ok) lines.push(`${ok} Removed ${style.bold(show(result.worktree, cwd))}`);
